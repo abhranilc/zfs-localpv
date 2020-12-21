@@ -67,7 +67,7 @@ func main() {
 	)
 
 	cmd.PersistentFlags().StringVar(
-		&config.DriverName, "name", "zfs.csi.openebs.io", "Name of this driver",
+		&config.DriverName, "name", "lvm.csi.openebs.io", "Name of this driver",
 	)
 
 	cmd.PersistentFlags().StringVar(

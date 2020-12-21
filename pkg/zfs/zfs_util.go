@@ -51,6 +51,12 @@ const (
 	ZFSRecvArg     = "recv"
 )
 
+// lvm command related constants
+const (
+	VGCreate = "vgcreate"
+	LVCreate = "lvcreate"
+)
+
 // constants to define volume type
 const (
 	VolTypeDataset = "DATASET"
@@ -84,47 +90,23 @@ func GetVolumeType(fstype string) string {
 	}
 }
 
-// builldZvolCreateArgs returns zfs create command for zvol along with attributes as a string array
-func buildZvolCreateArgs(vol *apis.ZFSVolume) []string {
-	var ZFSVolArg []string
+// builldLVMCreateArgs returns zfs create command for zvol along with attributes as a string array
+func buildLVMCreateArgs(vol *apis.ZFSVolume) []string {
+	var LVMVolArg []string
 
-	volume := vol.Spec.PoolName + "/" + vol.Name
+	volume := vol.Name
 
-	ZFSVolArg = append(ZFSVolArg, ZFSCreateArg)
-
-	if vol.Spec.ThinProvision == "yes" {
-		ZFSVolArg = append(ZFSVolArg, "-s")
-	}
 	if len(vol.Spec.Capacity) != 0 {
-		ZFSVolArg = append(ZFSVolArg, "-V", vol.Spec.Capacity)
-	}
-	if len(vol.Spec.VolBlockSize) != 0 {
-		ZFSVolArg = append(ZFSVolArg, "-b", vol.Spec.VolBlockSize)
-	}
-	if len(vol.Spec.Dedup) != 0 {
-		dedupProperty := "dedup=" + vol.Spec.Dedup
-		ZFSVolArg = append(ZFSVolArg, "-o", dedupProperty)
-	}
-	if len(vol.Spec.Compression) != 0 {
-		compressionProperty := "compression=" + vol.Spec.Compression
-		ZFSVolArg = append(ZFSVolArg, "-o", compressionProperty)
-	}
-	if len(vol.Spec.Encryption) != 0 {
-		encryptionProperty := "encryption=" + vol.Spec.Encryption
-		ZFSVolArg = append(ZFSVolArg, "-o", encryptionProperty)
-	}
-	if len(vol.Spec.KeyLocation) != 0 {
-		keyLocation := "keylocation=" + vol.Spec.KeyLocation
-		ZFSVolArg = append(ZFSVolArg, "-o", keyLocation)
-	}
-	if len(vol.Spec.KeyFormat) != 0 {
-		keyFormat := "keyformat=" + vol.Spec.KeyFormat
-		ZFSVolArg = append(ZFSVolArg, "-o", keyFormat)
+		LVMVolArg = append(LVMVolArg, "-L", vol.Spec.Capacity)
 	}
 
-	ZFSVolArg = append(ZFSVolArg, volume)
+	if len(vol.Spec.PoolName) != 0 {
+		LVMVolArg = append(LVMVolArg, "-n", vol.Spec.PoolName)
+	}
 
-	return ZFSVolArg
+	LVMVolArg = append(LVMVolArg, volume)
+
+	return LVMVolArg
 }
 
 // builldCloneCreateArgs returns zfs clone commands for zfs volume/dataset along with attributes as a string array
@@ -375,26 +357,17 @@ func getVolume(volume string) error {
 func CreateVolume(vol *apis.ZFSVolume) error {
 	volume := vol.Spec.PoolName + "/" + vol.Name
 
-	if err := getVolume(volume); err != nil {
-		var args []string
-		if vol.Spec.VolumeType == VolTypeDataset {
-			args = buildDatasetCreateArgs(vol)
-		} else {
-			args = buildZvolCreateArgs(vol)
-		}
-		cmd := exec.Command(ZFSVolCmd, args...)
-		out, err := cmd.CombinedOutput()
+	args := buildLVMCreateArgs(vol)
+	cmd := exec.Command(LVCreate, args...)
+	out, err := cmd.CombinedOutput()
 
-		if err != nil {
-			klog.Errorf(
-				"zfs: could not create volume %v cmd %v error: %s", volume, args, string(out),
-			)
-			return err
-		}
-		klog.Infof("created volume %s", volume)
-	} else if err == nil {
-		klog.Infof("using existing volume %v", volume)
+	if err != nil {
+		klog.Errorf(
+			"zfs: could not create volume %v cmd %v error: %s", volume, args, string(out),
+		)
+		return err
 	}
+	klog.Infof("lvm: created volume %s", volume)
 
 	return nil
 }
